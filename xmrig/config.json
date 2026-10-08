@@ -1,0 +1,26 @@
+{
+    "autosave": false,
+    "cpu": {
+        "enabled": true,
+        "huge-pages": true,
+        "yield": true
+    },
+    "randomx": {
+        "1gb-pages": false,
+        "mode": "auto"
+    },
+    "pools": [
+        {
+            "algo": "rx/0",
+            "url": "127.0.0.1:3333",
+            "user": "solo",
+            "pass": "x",
+            "keepalive": true,
+            "tls": false,
+            "nicehash": false
+        }
+    ],
+    "print-time": 10,
+    "retries": 5,
+    "retry-pause": 5
+}
