@@ -108,44 +108,59 @@ local setup):
 xmrig -c xmrig/config.json
 ```
 
-## End-to-end test (testnet, chainId 563321)
+## End-to-end test (private local devnet)
 
-1. **Init + start a testnet node** (synced to the tip, etherbase set):
+The acceptance test runs against a **private local devnet** (no bootnodes), so it
+needs no peers and no public testnet. It uses the testnet genesis (chainId
+563321) with a lowered starting difficulty so blocks land every few seconds on a
+single CPU.
+
+1. **Init the devnet** — `devnet.genesis.json` (shipped in this repo) is the
+   testnet genesis (chainId 563321) with `"difficulty": "0x1000"` (low, for fast
+   devnet blocks):
 
    ```bash
-   peercash init --datadir ./tnet <testnet-genesis.json>
-   peercash --datadir ./tnet --networkid 563321 --bootnodes <testnet-enodes> \
-            --miner.etherbase 0xYOUR_TESTNET_ADDRESS \
+   peercash init --datadir ./devnet devnet.genesis.json
+   ```
+
+2. **Start the node** — no local mining, no peers, etherbase set (the bridge
+   drives mining; the reward goes to this address):
+
+   ```bash
+   peercash --datadir ./devnet --networkid 563321 --nodiscover --maxpeers 0 \
+            --miner.etherbase 0xYOUR_TEST_ADDRESS \
             --http --http.addr 127.0.0.1 --http.port 8545 --http.api eth,net,web3
    ```
 
-   Wait until it is fully synced (otherwise work is built on a stale head and
-   solutions are rejected by peers).
-
-2. **Start the bridge:**
+3. **Start the bridge:**
 
    ```bash
-   ./peercash-bridge -node http://127.0.0.1:8545 -stratum :3333
+   ./peercash-bridge -node http://127.0.0.1:8545 -stratum 127.0.0.1:3333
    ```
 
-   You should see `new job <id> seal=0x... height=N workers=0` lines as work
-   rotates.
+   You should see `new job <id> seal=0x... height=N workers=0` as work rotates.
 
-3. **Start XMRig:**
+4. **Start XMRig:**
 
    ```bash
-   xmrig -c xmrig/config.json
+   xmrig -c xmrig/config.json --donate-level 0
    ```
 
-   XMRig logs `new job from 127.0.0.1:3333` and begins hashing rx/0.
+5. **Confirm.** The bridge logs `BLOCK ACCEPTED job=... worker=... nonce=0x...`
+   and a fresh `new job N ...` after each head change; the node logs
+   `Successfully sealed new RandomX block via remote sealer number=...`;
+   `eth_blockNumber` advances; and blocks are mined to your test address.
 
-4. **Confirm a block.** When XMRig finds one, the bridge logs
-   `BLOCK ACCEPTED job=... worker=... nonce=0x...`, the node logs
-   `Successfully sealed new RandomX block via remote sealer`, and the testnet
-   explorer shows the new block mined by `0xYOUR_TESTNET_ADDRESS` (the node's
-   etherbase).
+> **Public testnet caveat (chainId 563321).** The public 563321 testnet (bootnode
+> `167.71.186.249`) may still be running the **legacy keccak-stub** consensus, not
+> real RandomX. If so, XMRig cannot mine it and a real-RandomX node cannot sync or
+> validate it — the public testnet must be **redeployed on real RandomX** before it
+> can be mined through this bridge or shown on testexplorer.peercash.io. The
+> private devnet above does not depend on the public testnet.
 
-> Testnet difficulty is low, so a single machine should find a block quickly.
+> On Windows, Microsoft Defender flags XMRig as a miner and will quarantine
+> `xmrig.exe`. Add an exclusion (`Add-MpPreference -ExclusionPath 'C:\xmrig'`) and
+> restore/re-extract it before running the test.
 
 ## Tests
 
