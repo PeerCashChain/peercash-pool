@@ -86,10 +86,48 @@ CGO_ENABLED=0 GOOS=linux   GOARCH=amd64 go build -o bin/peercash-bridge     ./cm
 ```
 peercash-bridge [flags]
 
-  -node     node JSON-RPC HTTP endpoint   (default http://127.0.0.1:8545)
-  -stratum  stratum listen address        (default :3333)
-  -poll     eth_getWork poll interval      (default 500ms)
+  -node        node JSON-RPC HTTP endpoint   (default http://127.0.0.1:8545)
+  -stratum     stratum listen address        (default 127.0.0.1:3333, loopback-only)
+  -stats       optional stats HTTP endpoint  (off by default, e.g. 127.0.0.1:8090)
+  -poll        eth_getWork poll interval     (default 500ms)
+  -max-conns   max total connections         (default 256)
+  -max-per-ip  max connections per IP         (default 16)
 ```
+
+### Hardening (solo bridge)
+
+This is a **solo** bridge: every block any connected miner finds pays the
+node's configured `--miner.etherbase`, regardless of the miner's `login`. It is
+not a pool. The listener defaults to `127.0.0.1:3333`; if you pass a
+non-loopback `-stratum` address the bridge prints a startup warning, since every
+miner you let in mines for that one address.
+
+It defends the node and itself against misbehaving/hostile clients on the LAN:
+
+- **Bounded reads** — each stratum line is capped at 4 KB; a longer line closes
+  the connection.
+- **Deadlines** — 10 s to send the initial `login`, then a 5 min idle read
+  deadline (reset on every message), and a 10 s write deadline so a stuck client
+  can't block job pushes to others.
+- **Connection limits** — `-max-conns` total (256) and `-max-per-ip` (16);
+  excess connections are refused and logged.
+- **Login required** — `submit`/`keepalived` before `login` are ignored; a
+  connection is dropped after 3 such messages.
+- **Local submit checks before the node** — a submission is relayed to
+  `eth_submitWork` only if it has a well-formed nonce/result, a known
+  (non-stale) job, is not a duplicate `(job_id, nonce)`, and **meets the network
+  target** (last 8 bytes of the result, little-endian, ≤ the job target). This
+  rejects spam locally with **no RandomX**; the node still runs the
+  authoritative RandomX check on anything relayed. Submits are also rate-limited
+  per connection (10/min).
+- **Bans** — 5 invalid submits from an IP within 10 min ban it for 30 min
+  (closing its connections and refusing new ones).
+- **Graceful shutdown** — SIGINT/SIGTERM stops accepting, closes connections,
+  and exits cleanly.
+
+The optional `-stats` endpoint serves read-only JSON: connected workers (IP,
+rig-id, connected-since), submits accepted/rejected, bans, blocks accepted, and
+the current job height.
 
 The node must expose the `eth` namespace over HTTP and have an etherbase set
 (it does **not** need `--mine`; the bridge drives mining, and the reward goes to

@@ -13,11 +13,15 @@ type request struct {
 	Params json.RawMessage `json:"params"`
 }
 
-// loginParams is the body of a "login" request.
+// loginParams is the body of a "login" request. Login is the worker's claimed
+// payout address and RigID an optional human label; the bridge logs both for
+// visibility but ignores them for payout (rewards always go to the node's
+// etherbase).
 type loginParams struct {
 	Login string   `json:"login"`
 	Pass  string   `json:"pass"`
 	Agent string   `json:"agent"`
+	RigID string   `json:"rigid"`
 	Algo  []string `json:"algo"`
 }
 
@@ -39,11 +43,15 @@ type job struct {
 	Height   uint64 `json:"height"`
 }
 
-// loginResult is the result object of a successful login.
+// loginResult is the result object of a successful login. Status stays "OK" so
+// XMRig proceeds normally; Note is an informational string (XMRig ignores
+// unknown fields) stating that this is a solo bridge paying the node's
+// etherbase, so a connecting operator can see payout does not follow login.
 type loginResult struct {
 	ID         string   `json:"id"` // session id
 	Job        *job     `json:"job"`
 	Status     string   `json:"status"`
+	Note       string   `json:"note,omitempty"`
 	Extensions []string `json:"extensions"`
 }
 

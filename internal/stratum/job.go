@@ -26,11 +26,12 @@ const (
 // Work is one unit of mining work derived from eth_getWork, pre-converted into
 // the forms the stratum layer needs.
 type Work struct {
-	JobID    string
-	SealHash [32]byte
-	SeedHex  string // 64 hex chars, no 0x (XMRig "seed_hash")
-	TargetLE string // 16 hex chars, little-endian (XMRig "target")
-	Height   uint64
+	JobID     string
+	SealHash  [32]byte
+	SeedHex   string // 64 hex chars, no 0x (XMRig "seed_hash")
+	TargetLE  string // 16 hex chars, little-endian (XMRig "target")
+	TargetVal uint64 // the same target as a uint64, for local meetsTarget checks
+	Height    uint64
 }
 
 // NewWork builds a Work from raw eth_getWork fields (0x-prefixed hex) plus the
@@ -48,13 +49,27 @@ func NewWork(jobID, sealHashHex, seedHex, nodeTargetHex string, height uint64) (
 	if _, err := hex.DecodeString(seed); err != nil {
 		return nil, fmt.Errorf("seedHash: %w", err)
 	}
+	// target is 16 little-endian hex chars; decode back to the uint64 value so
+	// the server can check submissions locally without RandomX.
+	tb, _ := hex.DecodeString(target)
 	return &Work{
-		JobID:    jobID,
-		SealHash: sealHash,
-		SeedHex:  seed,
-		TargetLE: target,
-		Height:   height,
+		JobID:     jobID,
+		SealHash:  sealHash,
+		SeedHex:   seed,
+		TargetLE:  target,
+		TargetVal: binary.LittleEndian.Uint64(tb),
+		Height:    height,
 	}, nil
+}
+
+// meetsTarget reports whether a 32-byte RandomX result satisfies the given
+// network target: the last 8 bytes read as a little-endian uint64 must be <=
+// target. This mirrors peercash-chain consensus/randomx meetsTarget exactly, so
+// the server can discard submissions that cannot be blocks before ever asking
+// the node to run the (expensive) real RandomX verification. The node still
+// performs the authoritative RandomX check on anything that gets this far.
+func meetsTarget(result [32]byte, target uint64) bool {
+	return binary.LittleEndian.Uint64(result[24:32]) <= target
 }
 
 // buildBlob assembles the 43-byte job blob for a worker's extranonce. Bytes
