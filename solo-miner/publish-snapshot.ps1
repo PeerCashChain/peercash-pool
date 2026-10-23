@@ -26,8 +26,11 @@ foreach ($f in @($Zip, $Manifest)) { if (-not (Test-Path $f)) { throw "missing: 
 # --- token ---
 $token = $env:GITHUB_TOKEN
 if (-not $token) {
-  $cred = "protocol=https`nhost=github.com`n`n" | git credential fill 2>$null
-  $token = ($cred | Select-String '^password=').ToString().Substring(9)
+  # Pipe each request line as its own array element (git credential needs LF-separated
+  # lines terminated by a blank line; a here-string with `n is mis-parsed on Windows).
+  $cred = @("protocol=https", "host=github.com", "") | git credential fill 2>$null
+  $line = $cred | Where-Object { $_ -like 'password=*' } | Select-Object -First 1
+  if ($line) { $token = $line.Substring(9) }
 }
 if (-not $token) { throw "No GitHub token (set GITHUB_TOKEN or sign in to git for github.com)." }
 $auth = @{ Authorization = "Bearer $token"; Accept = "application/vnd.github+json" }

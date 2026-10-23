@@ -42,9 +42,14 @@ JSON, camelCase keys. The app deserializes exactly these fields (extra keys igno
 | `chainId` | sanity | Must be mainnet `0x9767c`. |
 | `stateScheme` | sanity | Must be `path` (see above). |
 
-The **zip's top-level entries are the CONTENTS of `chaindata`** (incl. the `ancient/`
-freezer), i.e. produced by `Compress-Archive -Path <datadir>\peercash\chaindata\*`.
-The app extracts them straight into `<datadir>\peercash\chaindata`.
+The **zip's top-level entries are the instance dirs `chaindata/` and `triedb/`** (the
+former incl. the `ancient/` freezer; the latter holds `merkle.journal`). The app
+extracts them into `<datadir>\peercash\` (yielding `peercash\chaindata` + `peercash\triedb`).
+
+CRITICAL: `triedb/merkle.journal` is the path-scheme (PBSS) head-state journal, written
+only on a CLEAN node shutdown. Without it, a restored node has no head state and
+rewinds ~90k blocks to the on-disk layer. The snapshot is useless without triedb/, so
+always cut from a gracefully-stopped node (it logs `Persisted dirty state to file`).
 
 ## Where it's published (stable URL)
 

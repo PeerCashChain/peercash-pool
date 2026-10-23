@@ -21,7 +21,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$chaindata = Join-Path $Datadir "peercash\chaindata"
+$instance  = Join-Path $Datadir "peercash"
+$chaindata = Join-Path $instance "chaindata"
+$triedb    = Join-Path $instance "triedb"   # holds merkle.journal (PBSS head-state diffs)
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $headFile = Join-Path $OutDir "head.json"
 
@@ -66,10 +68,26 @@ if ($head.chainId -ne "0x9767c") {
   Write-Host ("WARNING: recorded chainId {0} is not mainnet 0x9767c" -f $head.chainId)
 }
 
+# CRITICAL: path-scheme (PBSS) keeps head state as in-memory diff layers that are
+# journaled to peercash\triedb\merkle.journal ONLY on a clean shutdown. Without it,
+# a restored node has no head state and rewinds ~90k blocks to the on-disk layer.
+# So the snapshot MUST include triedb/ next to chaindata/.
+$journal = Join-Path $triedb "merkle.journal"
+if (-not (Test-Path $journal)) {
+  Write-Host "WARNING: $journal not found."
+  Write-Host "The node was NOT cleanly stopped, so head state is not persisted and a"
+  Write-Host "restore will rewind ~90k blocks. Stop the node gracefully (it logs"
+  Write-Host "'Persisted dirty state to file') and re-run pass 2."
+}
+
 $zip = Join-Path $OutDir ("peercash-mainnet-snapshot-{0}.zip" -f $head.height)
 if (Test-Path $zip) { Remove-Item -Force $zip }
-Write-Host "Archiving $chaindata (incl. ancient freezer) ..."
-Compress-Archive -Path (Join-Path $chaindata "*") -DestinationPath $zip
+# Zip's top-level entries are the instance dirs chaindata/ and triedb/ (NOT their
+# contents) so a restore extracts straight into <datadir>\peercash\.
+$toArchive = @($chaindata)
+if (Test-Path $triedb) { $toArchive += $triedb }
+Write-Host "Archiving chaindata (incl. ancient freezer) + triedb (head-state journal) ..."
+Compress-Archive -Path $toArchive -DestinationPath $zip
 
 $sha = (Get-FileHash $zip -Algorithm SHA256).Hash
 # stateScheme MUST be "path": the PeerCash Wallet and the solo-miner .bat both launch
@@ -87,7 +105,7 @@ $manifest = [ordered]@{
   sha256      = $sha
   sizeBytes   = (Get-Item $zip).Length
   stateScheme = "path"
-  note        = "Extract the zip's contents into <datadir>\peercash\chaindata, then start the node. Verify: after sync, eth_getBlockByNumber at this height must return headHash."
+  note        = "Extract the zip's contents into <datadir>\peercash (yields chaindata/ + triedb/), then start the node. Verify: after sync, eth_getBlockByNumber at this height must return headHash."
 }
 $manifestFile = Join-Path $OutDir ("peercash-mainnet-snapshot-{0}.manifest.json" -f $head.height)
 $manifest | ConvertTo-Json | Set-Content -Encoding ascii $manifestFile

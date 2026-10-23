@@ -15,7 +15,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$chaindata = Join-Path $Datadir "peercash\chaindata"
+$instance  = Join-Path $Datadir "peercash"
+$chaindata = Join-Path $instance "chaindata"
+$triedb    = Join-Path $instance "triedb"
 
 if ((Test-Path $chaindata) -and -not $Force) {
   throw "chaindata already exists at $chaindata. Use -Force to overwrite (this REPLACES local chain data)."
@@ -41,11 +43,12 @@ if ($got -ne $Sha256.ToUpper()) {
 }
 Write-Host "SHA256 OK."
 
-# 3. extract into chaindata
+# 3. extract into the instance dir (zip contains chaindata/ and triedb/)
 if (Test-Path $chaindata) { Remove-Item -Recurse -Force $chaindata }
-New-Item -ItemType Directory -Force -Path $chaindata | Out-Null
-Write-Host "Extracting into $chaindata ..."
-Expand-Archive -Path $zip -DestinationPath $chaindata -Force
+if (Test-Path $triedb)    { Remove-Item -Recurse -Force $triedb }
+New-Item -ItemType Directory -Force -Path $instance | Out-Null
+Write-Host "Extracting into $instance (chaindata + triedb) ..."
+Expand-Archive -Path $zip -DestinationPath $instance -Force
 
 Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
 Write-Host ""
