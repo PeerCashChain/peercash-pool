@@ -2,3 +2,6 @@
 *.exe
 *.out
 *.test
+
+# Built solo-miner distributable (node/bridge binaries + zip) - not source
+solo-miner/dist/
