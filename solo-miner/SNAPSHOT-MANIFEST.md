@@ -25,7 +25,7 @@ JSON, camelCase keys. The app deserializes exactly these fields (extra keys igno
   "height":      139000,
   "headHash":    "0x2cb279558bb4b887ad5eda5cbd89a61dc28e27c4acab9609284076fad76df505",
   "file":        "peercash-mainnet-snapshot-139000.zip",
-  "url":         "https://github.com/PeerCashChain/PeerCash-Wallet/releases/download/snapshots/peercash-mainnet-snapshot-139000.zip",
+  "url":         "https://github.com/PeerCashChain/peercash-snapshots/releases/download/mainnet-latest/peercash-mainnet-snapshot-139000.zip",
   "sha256":      "5BEED286...A36B772C8",
   "sizeBytes":   341000000,
   "stateScheme": "path"
@@ -48,12 +48,12 @@ The app extracts them straight into `<datadir>\peercash\chaindata`.
 
 ## Where it's published (stable URL)
 
-The app's `snapshot_manifest_url` points at a **long-lived GitHub release tagged
-`snapshots`** on `PeerCashChain/PeerCash-Wallet`, so the URL is stable across app
-versions:
+The app's `snapshot_manifest_url` points at a **long-lived release tagged
+`mainnet-latest`** on the dedicated `PeerCashChain/peercash-snapshots` repo, so the
+URL is stable as snapshots are refreshed (assets are replaced in place):
 
 ```
-https://github.com/PeerCashChain/PeerCash-Wallet/releases/download/snapshots/peercash-mainnet-snapshot.json
+https://github.com/PeerCashChain/peercash-snapshots/releases/download/mainnet-latest/peercash-mainnet-snapshot.json
 ```
 
 Until a snapshot is published there the fetch 404s and the app simply syncs normally
@@ -61,10 +61,10 @@ Until a snapshot is published there the fetch 404s and the app simply syncs norm
 
 1. `make-snapshot.ps1 -Datadir <synced path-scheme datadir>` (two passes; node stopped
    for pass 2). Produces the zip + a manifest with `sha256`/`sizeBytes`/`height`.
-2. Upload the zip as an asset on the `snapshots` release; set `url` in the manifest to
-   that asset's download URL.
+2. Upload the zip as an asset on the `mainnet-latest` release (delete the old zip
+   first); set `url` in the manifest to that asset's download URL.
 3. Upload the manifest as `peercash-mainnet-snapshot.json` on the same release
-   (replace the old asset).
+   (replace the old asset). `publish-snapshot.ps1` automates steps 1-3.
 
 ## Staleness
 
